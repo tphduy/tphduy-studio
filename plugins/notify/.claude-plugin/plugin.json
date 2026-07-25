@@ -1,0 +1,9 @@
+{
+  "name": "notify",
+  "version": "1.0.0",
+  "description": "Duy Tran's personal Claude Code hooks — a macOS notification hook (desktop/audio/speech) for the Notification event.",
+  "author": {
+    "name": "Duy Tran"
+  },
+  "license": "MIT"
+}

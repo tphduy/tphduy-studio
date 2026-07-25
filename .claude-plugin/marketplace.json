@@ -1,0 +1,32 @@
+{
+  "name": "tphduy-studio",
+  "owner": {
+    "name": "Duy Tran"
+  },
+  "metadata": {
+    "description": "Duy Tran's personal Claude Code marketplace.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "dev-toolkit",
+      "source": "./plugins/dev-toolkit",
+      "description": "Personal toolkit: skills (grill-me, prove-it, vendored prompt-master).",
+      "version": "1.0.0",
+      "author": {
+        "name": "Duy Tran"
+      },
+      "license": "MIT"
+    },
+    {
+      "name": "notify",
+      "source": "./plugins/notify",
+      "description": "A macOS notification hook (desktop/audio/speech) for Claude Code's Notification event.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Duy Tran"
+      },
+      "license": "MIT"
+    }
+  ]
+}
