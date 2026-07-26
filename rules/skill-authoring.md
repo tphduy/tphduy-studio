@@ -8,22 +8,14 @@ paths:
 
 ## Content
 
-- Every loaded line costs tokens.
-- Add only what Claude lacks: org specifics, edge cases, non-obvious constraints. Skip defaults and library basics.
 - Match freedom to fragility:
   - many paths work → plain instruction ("summarize the test failures")
   - one preferred pattern → pseudocode (retry: try; on 5xx back off; cap 3)
   - fragile, hard-to-undo → exact script (the signed release-publish command)
 
-## Triggering
-
-- Make `description:` the trigger — one third-person line, leading with the use case in the user's words.
-- Put detailed conditions in `when_to_use:`. Front-load both — the listing truncates them.
-
 ## Structure
 
-- Keep `SKILL.md` under 500 lines; extract anything not needed on every invocation.
-- Put runnable code in `scripts/`; put everything else — templates, boilerplate, long detail — in `references/`. Name each file from `SKILL.md`; unreferenced files are invisible.
+- Put runnable code in `scripts/`; put everything else — templates, boilerplate, long detail — in `references/`.
 - Keep references one level deep. Add a contents list to any reference over ~100 lines.
 
 ## Portability
@@ -39,8 +31,6 @@ paths:
 
 ## Invocation
 
-- Leave skills model-invocable by default.
-- Set `disable-model-invocation: true` only when an unprompted run would be hard to undo — publish, deploy, send, delete.
 - Set `user-invocable: false` for pure background knowledge.
 
 ## Arguments
