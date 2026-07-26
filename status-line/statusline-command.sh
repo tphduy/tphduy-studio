@@ -16,6 +16,9 @@ worktree_branch=$(echo "$input" | jq -r '.worktree.branch // empty')
 # Rate limits
 five_pct=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty')
 week_pct=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty')
+five_reset=$(echo "$input" | jq -r '.rate_limits.five_hour.resets_at // empty')
+week_reset=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty')
+now=$(date +%s)
 
 # ANSI colors
 bold_green='\033[1;32m'
@@ -50,6 +53,23 @@ format_window() {
     printf '%dK' "$(( _n / 1000 ))"
   else
     printf '%d' "$_n"
+  fi
+}
+
+# Helper: format remaining seconds as compact largest-two-units countdown (e.g. 2h15m, 45m, 3d5h)
+# Usage: format_countdown <remaining_seconds> — prints nothing if remaining <= 0
+format_countdown() {
+  _remaining="$1"
+  [ "$_remaining" -le 0 ] && return 1
+  _days=$(( _remaining / 86400 ))
+  _hours=$(( (_remaining % 86400) / 3600 ))
+  _mins=$(( (_remaining % 3600) / 60 ))
+  if [ "$_days" -gt 0 ]; then
+    printf '%dd%dh' "$_days" "$_hours"
+  elif [ "$_hours" -gt 0 ]; then
+    printf '%dh%dm' "$_hours" "$_mins"
+  else
+    printf '%dm' "$_mins"
   fi
 }
 
@@ -97,6 +117,11 @@ if [ -n "$five_pct" ]; then
   five_int=$(printf '%.0f' "$five_pct")
   five_color=$(color_for_pct "$five_int")
   five_part="⏳ ${five_color}${five_int}%%${reset}"
+  if [ -n "$five_reset" ]; then
+    five_reset_int=$(printf '%.0f' "$five_reset")
+    five_countdown=$(format_countdown "$(( five_reset_int - now ))")
+    [ -n "$five_countdown" ] && five_part="${five_part} ${dim}(${five_countdown})${reset}"
+  fi
 fi
 
 # 7-day rate limit segment
@@ -105,6 +130,11 @@ if [ -n "$week_pct" ]; then
   week_int=$(printf '%.0f' "$week_pct")
   week_color=$(color_for_pct "$week_int")
   week_part="📅 ${week_color}${week_int}%%${reset}"
+  if [ -n "$week_reset" ]; then
+    week_reset_int=$(printf '%.0f' "$week_reset")
+    week_countdown=$(format_countdown "$(( week_reset_int - now ))")
+    [ -n "$week_countdown" ] && week_part="${week_part} ${dim}(${week_countdown})${reset}"
+  fi
 fi
 
 # Worktree segment (only shown when active)
