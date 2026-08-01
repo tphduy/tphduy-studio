@@ -4,7 +4,8 @@ Personal Claude Code plugin marketplace.
 
 ## Plugins
 
-- `plugins/dev-toolkit/` — skills: `prove-it` (personal), `prompt-master` (vendored via `git subtree` from [nidhinjs/prompt-master](https://github.com/nidhinjs/prompt-master), MIT — see its own `LICENSE`/`README.md`). To pull upstream updates: `git subtree pull --prefix=plugins/dev-toolkit/skills/prompt-master https://github.com/nidhinjs/prompt-master.git main --squash`.
+- `plugins/prompt-master/` — `prompt-master` skill (vendored via `git subtree` from [nidhinjs/prompt-master](https://github.com/nidhinjs/prompt-master), MIT — see its own `LICENSE`/`README.md`). To pull upstream updates: `git subtree pull --prefix=plugins/prompt-master/skills/prompt-master https://github.com/nidhinjs/prompt-master.git main --squash`.
+- `plugins/prove-it/` — `prove-it` skill (personal).
 - `plugins/notify/` — a macOS notification hook (desktop/audio/speech) for Claude Code's `Notification` event. Requires `terminal-notifier` and `jq` — see [plugins/notify/README.md](plugins/notify/README.md).
 
 ## Third-party skills
@@ -32,11 +33,12 @@ git clone https://github.com/tphduy/tphduy-studio
 cd tphduy-studio
 ```
 
-2. Inside a Claude Code session, add the marketplace and install both plugins:
+2. Inside a Claude Code session, add the marketplace and install the plugins:
 
 ```bash
 /plugin marketplace add tphduy/tphduy-studio
-/plugin install dev-toolkit@tphduy-studio
+/plugin install prompt-master@tphduy-studio
+/plugin install prove-it@tphduy-studio
 /plugin install notify@tphduy-studio
 ```
 

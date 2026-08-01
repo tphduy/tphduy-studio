@@ -1,9 +1,0 @@
-{
-  "name": "dev-toolkit",
-  "version": "1.0.0",
-  "description": "Duy Tran's personal Claude Code toolkit — skills (prove-it, vendored prompt-master).",
-  "author": {
-    "name": "Duy Tran"
-  },
-  "license": "MIT"
-}

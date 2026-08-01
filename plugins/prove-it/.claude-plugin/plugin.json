@@ -1,0 +1,9 @@
+{
+  "name": "prove-it",
+  "version": "1.0.0",
+  "description": "Duy Tran's personal Claude Code toolkit — prove-it skill.",
+  "author": {
+    "name": "Duy Tran"
+  },
+  "license": "MIT"
+}

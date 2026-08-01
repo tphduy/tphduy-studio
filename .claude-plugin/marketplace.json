@@ -9,9 +9,19 @@
   },
   "plugins": [
     {
-      "name": "dev-toolkit",
-      "source": "./plugins/dev-toolkit",
-      "description": "Personal toolkit: skills (prove-it, vendored prompt-master).",
+      "name": "prompt-master",
+      "source": "./plugins/prompt-master",
+      "description": "Personal toolkit: vendored prompt-master skill.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Duy Tran"
+      },
+      "license": "MIT"
+    },
+    {
+      "name": "prove-it",
+      "source": "./plugins/prove-it",
+      "description": "Personal toolkit: prove-it skill.",
       "version": "1.0.0",
       "author": {
         "name": "Duy Tran"
