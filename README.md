@@ -4,8 +4,24 @@ Personal Claude Code plugin marketplace.
 
 ## Plugins
 
-- `plugins/dev-toolkit/` — skills: `prove-it` (personal), `prompt-master` (vendored via `git subtree` from [nidhinjs/prompt-master](https://github.com/nidhinjs/prompt-master), MIT — see its own `LICENSE`/`README.md`), `i-have-adhd` (vendored via `git subtree` from the `skills/i-have-adhd` subdirectory of [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd), MIT — see its own `LICENSE`/`README.md`), `grilling` and `writing-great-skills` (vendored via `git subtree` from the `skills/productivity/grilling` and `skills/productivity/writing-great-skills` subdirectories of [mattpocock/skills](https://github.com/mattpocock/skills), MIT — see each one's own `LICENSE`/`README.md`). To pull upstream updates: `git subtree pull --prefix=plugins/dev-toolkit/skills/prompt-master https://github.com/nidhinjs/prompt-master.git main --squash` (for `i-have-adhd`, `grilling`, and `writing-great-skills`, see each skill's own `README.md` for the split-and-pull steps).
+- `plugins/dev-toolkit/` — skills: `prove-it` (personal), `prompt-master` (vendored via `git subtree` from [nidhinjs/prompt-master](https://github.com/nidhinjs/prompt-master), MIT — see its own `LICENSE`/`README.md`). To pull upstream updates: `git subtree pull --prefix=plugins/dev-toolkit/skills/prompt-master https://github.com/nidhinjs/prompt-master.git main --squash`.
 - `plugins/notify/` — a macOS notification hook (desktop/audio/speech) for Claude Code's `Notification` event. Requires `terminal-notifier` and `jq` — see [plugins/notify/README.md](plugins/notify/README.md).
+
+## Third-party skills
+
+`i-have-adhd`, `grilling`, and `writing-great-skills` used to be vendored into `dev-toolkit` — now install them directly from their own upstream marketplaces instead:
+
+```bash
+claude plugin marketplace add ayghri/i-have-adhd
+claude plugin install i-have-adhd@i-have-adhd
+```
+
+```bash
+claude plugin marketplace add mattpocock/skills
+claude plugin install mattpocock-skills@mattpocock-skills
+```
+
+The `mattpocock/skills` marketplace ships one bundled plugin (`mattpocock-skills`) covering all of Matt Pocock's skills, including `grilling` and `writing-great-skills` — there's no way to install just one of those two separately through the marketplace.
 
 ## Setup on a new machine
 

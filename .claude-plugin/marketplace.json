@@ -11,7 +11,7 @@
     {
       "name": "dev-toolkit",
       "source": "./plugins/dev-toolkit",
-      "description": "Personal toolkit: skills (prove-it, vendored prompt-master, i-have-adhd, grilling, writing-great-skills).",
+      "description": "Personal toolkit: skills (prove-it, vendored prompt-master).",
       "version": "1.0.0",
       "author": {
         "name": "Duy Tran"
