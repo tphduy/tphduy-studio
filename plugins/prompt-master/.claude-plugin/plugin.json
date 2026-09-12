@@ -1,0 +1,9 @@
+{
+  "name": "prompt-master",
+  "version": "1.0.0",
+  "description": "Duy Tran's personal Claude Code toolkit — vendored prompt-master skill.",
+  "author": {
+    "name": "Duy Tran"
+  },
+  "license": "MIT"
+}

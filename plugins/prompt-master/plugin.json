@@ -1,0 +1,10 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "prompt-master",
+  "version": "1.0.0",
+  "description": "Duy Tran's personal Codex toolkit — vendored prompt-master skill.",
+  "author": {
+    "name": "Duy Tran"
+  },
+  "license": "MIT"
+}
