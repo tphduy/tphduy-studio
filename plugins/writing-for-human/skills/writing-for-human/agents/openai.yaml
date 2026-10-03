@@ -1,0 +1,4 @@
+interface:
+  display_name: "Writing for Human"
+  short_description: "Draft and revise prose in your voice"
+  default_prompt: "Use $writing-for-human to revise this draft in my voice while preserving my meaning."
