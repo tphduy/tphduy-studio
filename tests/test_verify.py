@@ -82,6 +82,27 @@ class VerifyTests(unittest.TestCase):
             checker.native()
         self.assertEqual(checker.report()["status"], "inconclusive")
 
+    def native_with(self, returncode, stdout, stderr=""):
+        checker = self.structure()
+        result = verify.subprocess.CompletedProcess([], returncode, stdout, stderr)
+        with patch.object(verify.shutil, "which", return_value="claude"), patch.object(verify.subprocess, "run", return_value=result):
+            checker.native()
+        return [x for x in checker.results if x["check"].startswith("Claude validate")]
+
+    def test_native_success_json_passes(self):
+        report = json.dumps({"success": True, "manifest": {"errors": [], "warnings": []}, "contents": []})
+        self.assertTrue(all(x["status"] == "pass" for x in self.native_with(0, report)))
+
+    def test_native_warning_fails_even_with_exit_zero(self):
+        report = json.dumps({"success": True, "manifest": {"errors": [], "warnings": ["Unknown field"]}, "contents": []})
+        self.assertTrue(all(x["status"] == "failed" for x in self.native_with(0, report)))
+
+    def test_native_unreadable_json_fails(self):
+        self.assertTrue(all(x["status"] == "failed" for x in self.native_with(0, "Validation passed")))
+
+    def test_native_exit_two_is_inconclusive(self):
+        self.assertTrue(all(x["status"] == "inconclusive" for x in self.native_with(2, "", "boom")))
+
 
 if __name__ == "__main__":
     unittest.main()

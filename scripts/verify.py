@@ -245,11 +245,25 @@ class Verifier:
         if catalog is not None and isinstance(catalog.get("plugins"), list):
             targets.extend(self.root / "plugins" / entry["name"] for entry in catalog["plugins"] if isinstance(entry, dict) and isinstance(entry.get("name"), str) and NAME.fullmatch(entry["name"]))
         for target in targets:
+            check = f"Claude validate {target.relative_to(self.root)}"
             try:
                 process = subprocess.run(["claude", "plugin", "validate", str(target), "--strict", "--json"], capture_output=True, text=True, timeout=60)
-                self.record("pass" if process.returncode == 0 else "failed", f"Claude validate {target.relative_to(self.root)}", (process.stdout + process.stderr).strip())
             except (OSError, subprocess.TimeoutExpired) as error:
                 self.record("inconclusive", "Claude native validation", error)
+                continue
+            if process.returncode == 2:
+                self.record("inconclusive", check, f"validator hit an unexpected error: {process.stderr.strip()}")
+                continue
+            try:
+                report = json.loads(process.stdout)
+                problems = [*report["manifest"]["errors"], *report["manifest"]["warnings"]]
+                for item in report.get("contents", []):
+                    problems += [*item.get("errors", []), *item.get("warnings", [])]
+                passed = report["success"] is True and process.returncode == 0 and not problems
+            except (ValueError, KeyError, TypeError, AttributeError) as error:
+                self.record("failed", check, f"unreadable validator JSON: {error}")
+                continue
+            self.record("pass" if passed else "failed", check, "success: true, no errors or warnings" if passed else f"exit {process.returncode}: {problems or process.stdout.strip()}")
 
     def report(self):
         statuses = {item["status"] for item in self.results}
