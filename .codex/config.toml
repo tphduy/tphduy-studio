@@ -1,0 +1,6 @@
+# Maintenance sessions activate personal plugins explicitly for verification.
+[plugins."writing-for-human@tphduy-studio"]
+enabled = false
+
+[plugins."plugin-creator@openai-curated-remote"]
+enabled = true

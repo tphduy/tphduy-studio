@@ -1,0 +1,8 @@
+{
+  "name": "tphduy-studio",
+  "owner": {"name": "Duy Tran"},
+  "metadata": {"description": "Duy Tran's personal plugins for writing and engineering."},
+  "plugins": [
+    {"name": "writing-for-human", "source": "./plugins/writing-for-human"}
+  ]
+}

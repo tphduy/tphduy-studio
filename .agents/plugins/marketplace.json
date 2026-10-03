@@ -1,0 +1,12 @@
+{
+  "name": "tphduy-studio",
+  "interface": {"displayName": "Duy Tran's studio"},
+  "plugins": [
+    {
+      "name": "writing-for-human",
+      "source": {"source": "local", "path": "./plugins/writing-for-human"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_USE"},
+      "category": "Productivity"
+    }
+  ]
+}
