@@ -14,3 +14,9 @@ This is Duy Tran's personal plugin marketplace for Codex and Claude Code.
 Run `.venv/bin/python scripts/verify.py` and `.venv/bin/python -m unittest discover -s tests` after structural changes. For installation, updates, removal, or changed plugin behavior, verify the affected lifecycle and behavior on each supported platform.
 
 Report each check as `pass`, `failed`, or `inconclusive`, with evidence. Structural validation alone does not prove runtime behavior.
+
+## Agent skills
+
+- Before issue or spec operations, read `docs/agents/issue-tracker.md`.
+- Before triaging, read `docs/agents/triage-labels.md`.
+- Before codebase exploration or changes to domain terminology or decisions, read `docs/agents/domain.md`.
