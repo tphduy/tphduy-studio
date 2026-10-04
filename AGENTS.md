@@ -11,6 +11,6 @@ This is Duy Tran's personal plugin marketplace for Codex and Claude Code.
 
 ## Verification
 
-Run `.venv/bin/python scripts/verify.py` and `.venv/bin/python -m unittest discover -s tests` after structural changes. For installation, updates, removal, or changed plugin behavior, follow [runtime verification](docs/verification.md).
+Run `.venv/bin/python scripts/verify.py` and `.venv/bin/python -m unittest discover -s tests` after structural changes. For installation, updates, removal, or changed plugin behavior, verify the affected lifecycle and behavior on each supported platform.
 
 Report each check as `pass`, `failed`, or `inconclusive`, with evidence. Structural validation alone does not prove runtime behavior.

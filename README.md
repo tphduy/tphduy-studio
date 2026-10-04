@@ -68,7 +68,7 @@ For Claude, refresh a Git-backed source with `claude plugin marketplace update t
 
 Uninstall with `codex plugin remove writing-for-human@tphduy-studio` or `claude plugin uninstall writing-for-human@tphduy-studio --scope local`. Use the same Claude scope used at installation. Removing catalog entries alone leaves installed copies until explicit uninstall.
 
-Follow [runtime verification and standalone-skill migration](docs/verification.md) before retiring an existing skill. Keep backups outside discovery roots. This repository becomes the source of truth for packaged content.
+Before retiring an existing skill, verify the replacement and keep backups outside discovery roots. This repository becomes the source of truth for packaged content.
 
 ## Platform references
 
