@@ -1,0 +1,7 @@
+{
+  "name": "prompt-master",
+  "version": "0.1.0",
+  "description": "Generate optimized prompts for AI tools when explicitly asked to write, fix, improve, or adapt a prompt for a specific LLM, coding agent, image, or video AI.",
+  "author": {"name": "Nidhin Joseph Nelson"},
+  "license": "MIT"
+}

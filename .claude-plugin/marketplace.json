@@ -3,6 +3,7 @@
   "owner": {"name": "Duy Tran"},
   "metadata": {"description": "Duy Tran's personal plugins for writing and engineering."},
   "plugins": [
-    {"name": "writing-for-human", "source": "./plugins/writing-for-human"}
+    {"name": "writing-for-human", "source": "./plugins/writing-for-human"},
+    {"name": "prompt-master", "source": "./plugins/prompt-master"}
   ]
 }
