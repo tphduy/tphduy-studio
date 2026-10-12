@@ -1,0 +1,8 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "json-design",
+  "version": "0.1.0",
+  "description": "Design and review JSON payload contracts and JSON Schemas while preserving existing consumer compatibility.",
+  "author": {"name": "Duy Tran"},
+  "license": "MIT"
+}

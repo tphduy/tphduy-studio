@@ -1,0 +1,4 @@
+interface:
+  display_name: "JSON Design"
+  short_description: "Design and review JSON contracts and schemas"
+  default_prompt: "Use $json-design to design or review this JSON contract and its schema, preserving existing consumer compatibility."

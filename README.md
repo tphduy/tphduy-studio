@@ -4,6 +4,7 @@ Duy Tran's personal plugin workshop for Codex and Claude Code. Plugin content is
 
 | Plugin | Codex | Claude Code |
 | --- | --- | --- |
+| json-design | Yes | Yes |
 | writing-for-human | Yes | Yes |
 | prompt-master | Yes | Yes |
 
