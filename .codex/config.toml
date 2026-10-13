@@ -1,3 +1,6 @@
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+
 # Maintenance sessions activate personal plugins explicitly for verification.
 [plugins."writing-for-human@tphduy-studio"]
 enabled = false
