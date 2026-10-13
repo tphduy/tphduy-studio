@@ -5,6 +5,7 @@
   "plugins": [
     {"name": "json-design", "source": "./plugins/json-design"},
     {"name": "writing-for-human", "source": "./plugins/writing-for-human"},
-    {"name": "prompt-master", "source": "./plugins/prompt-master"}
+    {"name": "prompt-master", "source": "./plugins/prompt-master"},
+    {"name": "verify-ios-change", "source": "./plugins/verify-ios-change"}
   ]
 }

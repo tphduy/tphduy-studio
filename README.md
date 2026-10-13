@@ -7,6 +7,7 @@ Duy Tran's personal plugin workshop for Codex and Claude Code. Plugin content is
 | json-design | Yes | Yes |
 | writing-for-human | Yes | Yes |
 | prompt-master | Yes | Yes |
+| verify-ios-change | No | Yes |
 
 ## Local setup
 
