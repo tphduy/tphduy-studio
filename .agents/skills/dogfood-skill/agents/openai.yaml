@@ -1,0 +1,7 @@
+interface:
+  display_name: "Dogfood Skill"
+  short_description: "Run a plugin skill headless and review the trial run"
+  default_prompt: "Use $dogfood-skill with plugin=<plugin dir> and target=<project dir> to run the plugin's skill headless with the claude CLI and review the trial run for skill improvements."
+
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,52 @@
+#!/bin/bash
+# Run one trial: snapshot the target, run the skill headless with a watchdog, snapshot again.
+#
+# Usage: run-trial RUN_DIR PLUGIN TARGET SKILL MODEL EFFORT TIMEOUT_SECONDS SESSION_ID [CONTEXT]
+# Writes to RUN_DIR: before.txt, after.txt, stream.jsonl, stderr.log, exit-code,
+# and timed-out when the watchdog fired. Exits 0 once the artifacts are written.
+
+set -u
+
+if [ "$#" -lt 8 ]; then
+  echo "usage: run-trial RUN_DIR PLUGIN TARGET SKILL MODEL EFFORT TIMEOUT_SECONDS SESSION_ID [CONTEXT]" >&2
+  exit 2
+fi
+
+run_dir=$1 plugin=$2 target=$3 skill=$4 model=$5 effort=$6 timeout=$7 session_id=$8 context=${9:-}
+
+# HEAD, working-tree status, tracked-diff hash, untracked-file hashes.
+snapshot() {
+  git -C "$target" rev-parse HEAD
+  git -C "$target" status --porcelain=v1 -uall
+  echo "diff-sha256 $(git -C "$target" diff HEAD | shasum -a 256 | cut -d' ' -f1)"
+  git -C "$target" ls-files -o --exclude-standard -z | (cd "$target" && xargs -0 -r shasum -a 256)
+}
+
+mkdir -p "$run_dir" || exit 2
+snapshot > "$run_dir/before.txt" || { echo "run-trial: cannot snapshot $target" >&2; exit 2; }
+
+prompt="/$skill${context:+ $context}"
+
+cd "$target" || exit 2
+claude -p "$prompt" \
+  --plugin-dir "$plugin" \
+  --model "$model" \
+  --effort "$effort" \
+  --permission-mode auto \
+  --session-id "$session_id" \
+  --output-format stream-json --verbose \
+  < /dev/null > "$run_dir/stream.jsonl" 2> "$run_dir/stderr.log" &
+claude_pid=$!
+
+( sleep "$timeout"; touch "$run_dir/timed-out"; kill -TERM "$claude_pid" ) 2>/dev/null &
+watchdog_pid=$!
+
+wait "$claude_pid"
+echo "$?" > "$run_dir/exit-code"
+
+pkill -P "$watchdog_pid" 2>/dev/null
+kill "$watchdog_pid" 2>/dev/null
+wait "$watchdog_pid" 2>/dev/null
+
+snapshot > "$run_dir/after.txt"
+exit 0
