@@ -62,6 +62,53 @@ Start a fresh session and explicitly invoke the installed skill: `$writing-for-h
 codex -c 'plugins."writing-for-human@tphduy-studio".enabled=true'
 ```
 
+## Enable the status line
+
+`statusline/statusline-command.sh` is a standalone Claude Code status line, not a plugin. It shows the model, session cost, worktree, uncommitted git changes, and context and rate-limit usage. Claude Code runs it only when `statusLine` in `settings.json` names it; installing a plugin from this marketplace does not enable it. Requires `jq`, `git`, and `awk`.
+
+Option A: clone the repository and point `settings.json` at the script. `<repository-url>` is a placeholder because no remote is configured yet; clone from your local checkout until one exists.
+
+```sh
+git clone <repository-url> ~/src/tphduy-studio
+```
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "~/src/tphduy-studio/statusline/statusline-command.sh"
+  }
+}
+```
+
+Option B: copy the script and point `settings.json` at the copy.
+
+```sh
+cp statusline/statusline-command.sh ~/.claude/statusline-command.sh
+chmod +x ~/.claude/statusline-command.sh
+```
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline-command.sh"
+  }
+}
+```
+
+Put the `statusLine` key in user settings, `~/.claude/settings.json`, and merge it with the keys already there. Project `.claude/settings.json` also works but would commit a machine-specific path. `~` expands in `command`; `$PWD` and `$HOME` do not. If the path contains spaces, quote it inside the string.
+
+Check the script without Claude Code, then start a new session:
+
+```sh
+echo '{"model":{"display_name":"Sonnet"},"cost":{"total_cost_usd":0.42}}' | ~/.claude/statusline-command.sh
+```
+
+The status line stays blank until the workspace trust dialog is accepted for the folder. Theme detection follows `STATUSLINE_THEME` (`light` or `dark`), then Claude's `theme` setting, macOS appearance, and `COLORFGBG`; set the variable to override it.
+
+Option A updates with `git pull`; Option B needs a fresh copy. To remove the status line, delete the `statusLine` key and, for Option B, the copied file.
+
 ## Updates and removal
 
 For a Git-backed Codex marketplace, refresh it with `codex plugin marketplace upgrade tphduy-studio`. For local sources, reinstall with `codex plugin remove writing-for-human@tphduy-studio` followed by `codex plugin add writing-for-human@tphduy-studio`, then start a new session. Codex caches installed files; edit source files, not caches.
