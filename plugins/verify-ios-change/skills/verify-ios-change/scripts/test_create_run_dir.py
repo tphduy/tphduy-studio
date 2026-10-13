@@ -73,7 +73,11 @@ class RunDirectoryTests(unittest.TestCase):
         self.assertEqual(runs_dir.parent, self.temp_dir / "Project-name/verify-ios-change/runs")
         self.assertRegex(runs_dir.name, r"^\d{8}T\d{6}\.\d{6}Z$")
         self.assertTrue(runs_dir.is_absolute())
-        self.assertEqual([path.name for path in runs_dir.iterdir()], ["manifest.json"])
+        self.assertEqual({path.name for path in runs_dir.iterdir()}, {"manifest.json", "index.html"})
+        html = (runs_dir / "index.html").read_text()
+        embedded = re.search(r'<script type="application/json" id="manifest">(.*?)</script>', html, re.S)
+        self.assertIsNotNone(embedded)
+        self.assertEqual(json.loads(embedded.group(1)), json.loads((runs_dir / "manifest.json").read_text()))
         manifest = json.loads((runs_dir / "manifest.json").read_text())
         self.assertEqual(manifest["schema"], 6)
         self.assertEqual(manifest["run"]["id"], runs_dir.name)
@@ -192,6 +196,24 @@ class RunDirectoryTests(unittest.TestCase):
                     RESOLVER["create_run_dir"](self.project_dir)
         self.assertEqual(list(parent.iterdir()), [])
 
+    def test_report_failure_removes_partial_run_and_prints_no_success_path(self):
+        parent = self.scratch_dir / "runs"
+        parent.mkdir()
+        stdout, stderr = io.StringIO(), io.StringIO()
+        from contextlib import redirect_stdout
+        generator = runpy.run_path(str(SCRIPT.with_name("generate-report")))
+        missing_template = self.scratch_dir / "missing.html"
+        with patch.dict(generator["generate_report"].__globals__, TEMPLATE=missing_template), patch.dict(
+            RESOLVER["create_run_dir"].__globals__, resolve_runs_dir=lambda _: parent
+        ), patch.object(RESOLVER["runpy"], "run_path", return_value=generator), patch.object(
+            RESOLVER["sys"], "argv", [str(SCRIPT), str(self.project_dir)]
+        ), redirect_stdout(stdout), redirect_stderr(stderr):
+            self.assertEqual(RESOLVER["main"](), 1)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assert_failure(stderr.getvalue())
+        self.assertIn("missing.html", stderr.getvalue())
+        self.assertEqual(list(parent.iterdir()), [])
+
     def test_old_override_is_not_an_alias(self):
         self.env["VERIFY_IOS_CHANGE_ROOT"] = str(self.scratch_dir / "old")
         self.assertEqual(Path(self.invoke().strip()).parent, self.temp_dir / "Project-name/verify-ios-change/runs")
@@ -202,9 +224,11 @@ class RunDirectoryTests(unittest.TestCase):
         scripts_dir = skill_dir / "scripts"
         scripts_dir.mkdir(parents=True)
         shutil.copy2(SCRIPT, scripts_dir / SCRIPT.name)
+        shutil.copy2(SCRIPT.with_name("generate-report"), scripts_dir / "generate-report")
         assets_dir = skill_dir / "assets"
         assets_dir.mkdir()
         shutil.copy2(SCRIPT.parent.parent / "assets/manifest.json", assets_dir / "manifest.json")
+        shutil.copy2(SCRIPT.parent.parent / "assets/index.html", assets_dir / "index.html")
         command = re.search(r"```sh\n\s*([^\n]+)\n\s*```", SKILL.read_text()).group(1)
         command = command.replace("${CLAUDE_SKILL_DIR}", str(skill_dir))
         command = command.replace("${CLAUDE_PROJECT_DIR}", str(self.project_dir))
@@ -218,6 +242,7 @@ class RunDirectoryTests(unittest.TestCase):
         self.assertEqual(Path(result.stdout.strip()).parent, Path(self.invoke().strip()).parent)
         run_dir = Path(result.stdout.strip())
         self.assertTrue(run_dir.is_dir())
+        self.assertTrue((run_dir / "index.html").is_file())
         self.assertEqual(json.loads((run_dir / "manifest.json").read_text())["run"]["session_id"], "session-1")
 
 

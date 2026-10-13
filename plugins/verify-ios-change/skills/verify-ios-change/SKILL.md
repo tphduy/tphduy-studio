@@ -15,7 +15,7 @@ Active effort: `${CLAUDE_EFFORT}`. Record the resolved value in `run.effort`; us
 
 ## Prepare environment
 
-1. Run the command below to scaffold this verification's **run directory** and `manifest.json`. Use its printed path for all evidence.
+1. Run the command below to scaffold this verification's **run directory**, `manifest.json` and `index.html`. Use its printed path for all evidence.
 
    ```sh
    "${CLAUDE_SKILL_DIR}/scripts/create-run-dir" "${CLAUDE_PROJECT_DIR}" "${CLAUDE_SESSION_ID}"

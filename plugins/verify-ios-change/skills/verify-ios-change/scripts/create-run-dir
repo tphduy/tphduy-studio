@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Initialize manifest.json in a fresh run directory outside the project checkouts.
+"""Initialize manifest.json and index.html in a fresh run directory outside the project checkouts.
 
 Usage: create-run-dir PROJECT_DIR [SESSION_ID]
 SESSION_ID is recorded as run.session_id; omitted or empty stays null.
@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
+import runpy
 import shutil
 import subprocess
 import sys
@@ -20,7 +21,7 @@ import tempfile
 
 RECOVERY = (
     "Create a fresh writable temporary run directory outside the project checkout "
-    "and initialize manifest.json from the skill template."
+    "and initialize manifest.json from the skill template, then run generate-report on it."
 )
 TEMPLATE = Path(__file__).resolve().parent.parent / "assets" / "manifest.json"
 
@@ -78,6 +79,8 @@ def create_run_dir(project_dir, session_id=None):
             (run_dir / "manifest.json").write_text(
                 json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8",
             )
+            generator = runpy.run_path(str(Path(__file__).with_name("generate-report")))
+            generator["generate_report"](run_dir)
         except Exception:
             shutil.rmtree(run_dir)
             raise

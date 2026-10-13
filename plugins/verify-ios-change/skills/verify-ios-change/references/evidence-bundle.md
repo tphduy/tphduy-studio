@@ -4,9 +4,9 @@
 
 ## Initialize and record
 
-`create-run-dir` creates a fresh run directory outside the project and main checkouts and initializes `manifest.json` from [the starter template](../assets/manifest.json), with run identity set and every collection empty. `index.html` is generated after preparation.
+`create-run-dir` creates a fresh run directory outside the project and main checkouts and initializes `manifest.json` from [the starter template](../assets/manifest.json), with run identity set and every collection empty. It then generates `index.html` from the initialized manifest.
 
-If scaffolding fails, recover with a fresh writable temporary run directory outside the checkout and copy the starter manifest into it. Set its run ID, absolute project directory and UTC start time. If evidence storage remains unavailable, stop and explain the blocker directly.
+If scaffolding fails, recover with a fresh writable temporary run directory outside the checkout and copy the starter manifest into it. Set its run ID, absolute project directory and UTC start time, then run `generate-report` on the run directory. If evidence storage remains unavailable, stop and explain the blocker directly.
 
 Keep the manifest valid JSON between updates. A recovered capability no longer appears as a blocker.
 
