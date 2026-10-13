@@ -1,0 +1,332 @@
+#!/usr/bin/env python3
+"""Validate a schema-6 manifest and its evidence.
+
+Usage: validate-manifest MANIFEST [--schema PATH] [--root DIR] [--report PATH]
+                         [--final] [--structure-only]
+MANIFEST is a manifest.json file or a run directory containing one. --schema defaults
+to ../assets/manifest.schema.json beside this script, --root (the base for artifact
+paths) to the manifest's directory and --report to ROOT/index.html.
+Stage 1 checks structure against the schema with the jsonschema package, else with
+`npx ajv-cli@5`; with neither it fails closed. Stage 2 checks IDs, references, local
+evidence files, action-driver selection and intervention records; --final also checks
+completion and the generated report. --structure-only stops after stage 1.
+Exit codes: 0 valid, 1 invalid, 2 unreadable manifest, schema or arguments,
+3 no JSON Schema validator available.
+Python 3 standard library; stage 1 needs jsonschema or Node.js.
+"""
+import argparse
+import json
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+
+
+SLOT = re.compile(r'<script type="application/json" id="manifest">(.*?)</script>', re.S)
+SCHEMA_VERSION = 6
+DEFAULT_SCHEMA = Path(__file__).resolve().parent.parent / "assets" / "manifest.schema.json"
+NO_VALIDATOR = (
+    "No JSON Schema validator is available. Install the jsonschema package "
+    "(python3 -m pip install jsonschema) or Node.js, which provides npx ajv-cli@5."
+)
+
+
+class ValidatorUnavailable(Exception):
+    pass
+
+
+class SchemaUnusable(Exception):
+    pass
+
+
+def location(parts):
+    text = ""
+    for part in parts:
+        text += f"[{part}]" if isinstance(part, int) else (f".{part}" if text else str(part))
+    return text or "manifest.json"
+
+
+def jsonschema_problems(jsonschema, schema, manifest):
+    validator = jsonschema.validators.validator_for(schema)
+    try:
+        validator.check_schema(schema)
+    except jsonschema.SchemaError as error:
+        raise SchemaUnusable(error.message) from error
+    errors = sorted(validator(schema).iter_errors(manifest), key=lambda e: [str(p) for p in e.absolute_path])
+    return [f"{location(error.absolute_path)}: {error.message}" for error in errors]
+
+
+def ajv_problems(manifest_path, schema_path):
+    npx = shutil.which("npx")
+    if npx is None:
+        raise ValidatorUnavailable(NO_VALIDATOR)
+    command = [
+        npx, "--yes", "ajv-cli@5", "validate", "--spec=draft2020", "--strict=false",
+        "--all-errors", "--errors=json", "-s", str(schema_path), "-d", str(manifest_path),
+    ]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=120)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ValidatorUnavailable(f"ajv-cli could not run ({error}). {NO_VALIDATOR}") from error
+    if result.returncode == 0:
+        return []
+    output = result.stdout + result.stderr
+    try:
+        # ajv-cli prints "<file> invalid" and then the JSON error array, on stderr.
+        errors, _ = json.JSONDecoder().raw_decode(output[output.index("\n[") + 1:])
+    except ValueError as error:
+        raise ValidatorUnavailable(f"ajv-cli failed: {output.strip()}") from error
+    problems = []
+    for error in errors:
+        parts = [int(p) if p.isdigit() else p.replace("~1", "/").replace("~0", "~")
+                 for p in error.get("instancePath", "").split("/")[1:]]
+        params = error.get("params", {})
+        extra = [repr(params[key]) if key.endswith("Property") else str(params[key])
+                 for key in ("additionalProperty", "missingProperty", "allowedValues", "allowedValue")
+                 if key in params]
+        problems.append(f"{location(parts)}: {error.get('message', 'invalid')}" + (f" ({', '.join(extra)})" if extra else ""))
+    return problems
+
+
+def schema_problems(manifest, manifest_path, schema_path):
+    try:
+        schema = json.loads(Path(schema_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise SchemaUnusable(str(error)) from error
+    try:
+        import jsonschema
+    except ImportError:
+        jsonschema = None
+    if jsonschema is not None:
+        return jsonschema_problems(jsonschema, schema, manifest)
+    return ajv_problems(manifest_path, schema_path)
+
+
+def check_file(manifest_path, schema=None, root=None, report=None, final=False, structure_only=False):
+    """Return (exit_code, problems) for a manifest file or a run directory."""
+    manifest_path = Path(manifest_path)
+    if manifest_path.is_dir():
+        manifest_path = manifest_path / "manifest.json"
+    schema = Path(schema) if schema else DEFAULT_SCHEMA
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        return 2, [f"manifest.json: {error}"]
+    if not isinstance(manifest, dict) or manifest.get("schema") != SCHEMA_VERSION:
+        return 1, [f"manifest.json: expected schema {SCHEMA_VERSION}"]
+    try:
+        problems = schema_problems(manifest, manifest_path, schema)
+    except ValidatorUnavailable as error:
+        return 3, [str(error)]
+    except SchemaUnusable as error:
+        return 2, [f"{schema}: {error}"]
+    if not problems and not structure_only:
+        base = Path(root) if root else manifest_path.parent
+        problems = validate(base, manifest, final=final, report=report)
+    return (1 if problems else 0), problems
+
+
+def validate(run_dir, manifest, final=False, report=None):
+    problems = []
+    add = problems.append
+    if not isinstance(manifest, dict) or manifest.get("schema") != SCHEMA_VERSION:
+        return [f"manifest.json: expected schema {SCHEMA_VERSION}"]
+
+    def records(value, where):
+        if not isinstance(value, list):
+            add(f"{where}: expected an array")
+            return []
+        if any(not isinstance(item, dict) for item in value):
+            add(f"{where}: expected object records")
+        return [item for item in value if isinstance(item, dict)]
+
+    def ids(value, where):
+        if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+            add(f"{where}: expected an array of IDs")
+            return []
+        return value
+
+    def index(items, where):
+        table = {}
+        for i, item in enumerate(items):
+            key = item.get("id")
+            if not isinstance(key, str) or not key:
+                add(f"{where}[{i}].id: expected a non-empty ID")
+            elif key in table:
+                add(f"{where}[{i}].id: duplicate ID {key!r}")
+            else:
+                table[key] = item
+        return table
+
+    collections = {key: records(manifest.get(key), key) for key in (
+        "test_cases", "revisions", "checks", "tools", "artifacts", "limitations",
+        "side_observations", "temporary_modifications",
+    )}
+    tables = {key: index(collections[key], key) for key in (
+        "test_cases", "revisions", "checks", "tools", "artifacts",
+    )}
+
+    def reference(value, collection, where):
+        if not isinstance(value, str) or value not in tables[collection]:
+            add(f"{where}: unknown {collection} ID {value!r}")
+
+    def references(item, field, collection, where):
+        values = ids(item.get(field), f"{where}.{field}")
+        for value in values:
+            reference(value, collection, f"{where}.{field}")
+        return values
+
+    root = Path(run_dir).resolve()
+    for i, artifact in enumerate(collections["artifacts"]):
+        path = artifact.get("path")
+        where = f"artifacts[{i}].path"
+        if (not isinstance(path, str) or not path or path.startswith("/") or "\\" in path
+                or re.match(r"^[a-z][a-z0-9+.-]*:", path, re.I)
+                or any(ord(char) < 32 or ord(char) == 127 for char in path)
+                or any(part in ("", ".", "..") for part in path.split("/"))):
+            add(f"{where}: expected a relative file path inside the run directory")
+            continue
+        try:
+            file = (root / path).resolve()
+            if not file.is_relative_to(root):
+                add(f"{where}: resolves outside the run directory")
+            elif not file.is_file():
+                add(f"{where}: {path!r} does not exist")
+        except (OSError, RuntimeError) as error:
+            add(f"{where}: cannot resolve file ({error})")
+
+    for i, case in enumerate(collections["test_cases"]):
+        where = f"test_cases[{i}]"
+        evidence = list(references(case, "artifacts", "artifacts", where))
+        steps = records(case.get("steps"), f"{where}.steps")
+        for j, step in enumerate(steps):
+            evidence += references(step, "artifacts", "artifacts", f"{where}.steps[{j}]")
+        status = case.get("status")
+        if status in ("pass", "assisted_pass"):
+            if not steps or any(not isinstance(step.get("observed"), str) or not step["observed"].strip() for step in steps):
+                add(f"{where}: {status} requires observed results for every step")
+            if not any(tables["artifacts"].get(key, {}).get("kind") == "screenshot" for key in evidence):
+                add(f"{where}: {status} requires a screenshot artifact")
+        if status == "fail":
+            if not any(isinstance(step.get("observed"), str) and step["observed"].strip() for step in steps):
+                add(f"{where}: fail requires an observed mismatch")
+            if not evidence:
+                add(f"{where}: fail requires evidence artifacts")
+        if status == "withdrawn" and not evidence:
+            add(f"{where}: withdrawal requires evidence artifacts")
+        if status in ("assisted_pass", "fail", "inconclusive", "withdrawn") and not str(case.get("detail") or "").strip():
+            add(f"{where}.detail: explain {status}")
+        if final and status == "planned":
+            add(f"{where}: final run still has a planned test case")
+
+    advanced_cases = set()
+    advanced_used = False
+    for key in ("revisions", "limitations", "side_observations"):
+        for i, item in enumerate(collections[key]):
+            where = f"{key}[{i}]"
+            cases = references(item, "test_cases", "test_cases", where)
+            references(item, "artifacts", "artifacts", where)
+            if key == "revisions":
+                if item.get("phase") == "advanced":
+                    advanced_used = True
+                    advanced_cases.update(cases)
+                    if not cases or not str(item.get("summary") or "").strip():
+                        add(f"{where}: advanced recovery requires affected cases and an exhaustion/hypothesis summary")
+
+    for i, check in enumerate(collections["checks"]):
+        where = f"checks[{i}]"
+        references(check, "artifacts", "artifacts", where)
+        if check.get("impact") is not None:
+            if check.get("status") not in ("fail", "inconclusive"):
+                add(f"{where}: blocker or limitation requires fail or inconclusive")
+            if not str(check.get("detail") or "").strip():
+                add(f"{where}.detail: explain the unavailable capability")
+
+    run = manifest.get("run")
+    if not isinstance(run, dict):
+        add("run: expected an object")
+        run = {}
+    driver = run.get("action_driver")
+    action_tools = [tool.get("id") for tool in collections["tools"]
+                    if isinstance(tool.get("roles"), list) and "action_driver" in tool["roles"]]
+    if driver is not None:
+        reference(driver, "tools", "run.action_driver")
+    if action_tools != ([] if driver is None else [driver]):
+        add("run.action_driver: must identify the one tool with role action_driver")
+    if any(case.get("status") in ("pass", "assisted_pass", "fail") for case in collections["test_cases"]) and driver is None:
+        add("run.action_driver: exercised cases require a selected action driver")
+
+    assisted_cases = set()
+    for i, modification in enumerate(collections["temporary_modifications"]):
+        where = f"temporary_modifications[{i}]"
+        cases = references(modification, "test_cases", "test_cases", where)
+        result_cases = references(modification, "result_cases", "test_cases", where)
+        if not set(result_cases).issubset(cases):
+            add(f"{where}.result_cases: must be a subset of test_cases")
+        evidence = references(modification, "artifacts", "artifacts", where)
+        if modification.get("purpose") == "intervention":
+            advanced_used = True
+            assisted_cases.update(result_cases)
+            if not cases or not str(modification.get("scope") or "").strip():
+                add(f"{where}: intervention requires affected cases and scope/limits")
+            for case_id in cases:
+                if case_id not in advanced_cases:
+                    add(f"{where}: {case_id} requires an advanced recovery revision")
+            for case_id in result_cases:
+                case = tables["test_cases"].get(case_id, {})
+                if case.get("status") == "pass":
+                    add(f"{where}: {case_id} depends on an intervention; use assisted_pass")
+                if case.get("status") == "assisted_pass" and not evidence:
+                    add(f"{where}: assisted_pass requires intervention evidence")
+        if final:
+            for field in ("runtime_state", "restoration"):
+                if not str(modification.get(field) or "").strip():
+                    add(f"{where}.{field}: required at Finish, independently of the case result")
+
+    for case in collections["test_cases"]:
+        if case.get("status") == "assisted_pass":
+            advanced_used = True
+            if case.get("id") not in assisted_cases:
+                add(f"test_cases: {case.get('id')} assisted_pass requires a linked intervention")
+    if advanced_used and run.get("effort") not in ("high", "xhigh", "max"):
+        add("run.effort: advanced recovery requires high, xhigh or max")
+
+    if final:
+        for field in ("id", "project_dir", "started_at"):
+            if not isinstance(run.get(field), str) or not run[field].strip():
+                add(f"run.{field}: required for a final run")
+        if not collections["test_cases"] and not any(check.get("impact") == "blocker" for check in collections["checks"]):
+            add("test_cases: an empty final run must explain a blocker in checks")
+        try:
+            html = (Path(report) if report else root / "index.html").read_text(encoding="utf-8")
+            slots = SLOT.findall(html)
+            if len(slots) != 1:
+                add("index.html: expected exactly one manifest script element")
+            elif json.loads(slots[0]) != manifest:
+                add("index.html: embedded manifest differs from manifest.json; regenerate the report")
+        except (OSError, ValueError) as error:
+            add(f"index.html: missing, unreadable or invalid embedded JSON ({error})")
+    return problems
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("manifest", type=Path, help="manifest.json file or run directory")
+    parser.add_argument("--schema", type=Path, help="JSON Schema file (default: the skill's schema)")
+    parser.add_argument("--root", type=Path, help="base directory for artifact paths (default: manifest directory)")
+    parser.add_argument("--report", type=Path, help="generated report for --final (default: ROOT/index.html)")
+    parser.add_argument("--final", action="store_true", help="require completed cases and a matching report")
+    parser.add_argument("--structure-only", action="store_true", help="check the schema only")
+    args = parser.parse_args()
+    code, problems = check_file(
+        args.manifest, schema=args.schema, root=args.root, report=args.report,
+        final=args.final, structure_only=args.structure_only,
+    )
+    for problem in problems:
+        print(problem, file=sys.stdout if code == 1 else sys.stderr)
+    return code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

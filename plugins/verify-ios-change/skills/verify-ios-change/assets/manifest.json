@@ -1,0 +1,27 @@
+{
+  "schema": 6,
+  "run": {
+    "id": null,
+    "session_id": null,
+    "project_dir": null,
+    "started_at": null,
+    "action_driver": null,
+    "effort": null
+  },
+  "environment": {
+    "xcode": null,
+    "runtime": null,
+    "device": null,
+    "udid": null,
+    "bundle_id": null,
+    "commit": null
+  },
+  "test_cases": [],
+  "revisions": [],
+  "checks": [],
+  "tools": [],
+  "artifacts": [],
+  "limitations": [],
+  "side_observations": [],
+  "temporary_modifications": []
+}

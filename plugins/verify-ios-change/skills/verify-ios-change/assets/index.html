@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>iOS verification report</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fff; --fg: #1d1d1f; --muted: #62626a; --line: #d2d2d7; --card: #f5f5f7;
+  --pass: #176b31; --assisted-pass: #275ab5; --fail: #b42318; --inconclusive: #885a00;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111113; --fg: #f2f2f7; --muted: #b1b1bb; --line: #424248; --card: #1c1c1e;
+    --pass: #67da8a; --assisted-pass: #9dbfff; --fail: #ff8a83; --inconclusive: #efc66b;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 -apple-system, system-ui, sans-serif; overflow-wrap: anywhere; }
+main { max-width: 1100px; margin: auto; padding: 32px 20px 64px; }
+h1 { font-size: 26px; margin: 0 0 8px; }
+h2 { font-size: 19px; margin: 32px 0 12px; }
+h3 { font-size: 17px; margin: 0; }
+h4 { font-size: 14px; margin: 16px 0 6px; }
+p { margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+ul { padding-left: 22px; }
+a { color: inherit; text-underline-offset: 3px; overflow-wrap: anywhere; }
+a:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+.muted { color: var(--muted); }
+.status { display: inline-block; font-size: 12px; font-weight: 600; border: 1px solid currentColor; border-radius: 999px; padding: 2px 9px; }
+.pass { color: var(--pass); }
+.assisted_pass { color: var(--assisted-pass); }
+.fail { color: var(--fail); }
+.inconclusive { color: var(--inconclusive); }
+.planned, .withdrawn, .not_applicable { color: var(--muted); }
+.counts, .case-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.counts { margin: 16px 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin: 12px 0; }
+.notice { border-left: 4px solid var(--inconclusive); padding: 8px 12px; background: var(--card); }
+.table-wrap { overflow-x: auto; margin-top: 12px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); padding: 8px; min-width: 120px; white-space: pre-wrap; overflow-wrap: anywhere; }
+th:first-child, td:first-child { padding-left: 0; }
+.evidence { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+figure { margin: 0; max-width: 280px; }
+figure img, figure video { display: block; max-width: 100%; max-height: 440px; border: 1px solid var(--line); border-radius: 6px; }
+figcaption { margin-top: 4px; font-size: 12px; overflow-wrap: anywhere; }
+dl { display: grid; grid-template-columns: minmax(100px, max-content) minmax(0, 1fr); gap: 6px 16px; }
+dt { color: var(--muted); }
+dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 540px) { main { padding: 20px 12px 48px; } .card { padding: 12px; } }
+</style>
+</head>
+<body>
+<main id="app"><p class="muted">Report template: run scripts/generate-report with the run directory to display its manifest.</p></main>
+<noscript><p>This report needs JavaScript to display its embedded manifest.</p></noscript>
+<!-- scripts/generate-report embeds schema-6 JSON below with less-than signs escaped. -->
+<script type="application/json" id="manifest"></script>
+<script>
+(() => {
+  "use strict";
+  const app = document.getElementById("app");
+  const raw = document.getElementById("manifest").textContent.trim();
+  if (!raw) return;
+  let manifest;
+  try {
+    manifest = JSON.parse(raw);
+  } catch (error) {
+    app.textContent = "Manifest is not valid JSON: " + error.message;
+    return;
+  }
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+    app.textContent = "Manifest must be a JSON object.";
+    return;
+  }
+  if (manifest.schema !== 6) {
+    app.textContent = "Unsupported manifest schema " + JSON.stringify(manifest.schema) + ". This template displays schema 6.";
+    return;
+  }
+  if (!Array.isArray(manifest.test_cases)) {
+    app.textContent = "Manifest test_cases must be an array.";
+    return;
+  }
+
+  const statuses = ["planned", "pass", "assisted_pass", "fail", "inconclusive", "withdrawn"];
+  const list = value => Array.isArray(value) ? value : [];
+  const records = value => list(value).filter(item => item && typeof item === "object" && !Array.isArray(item));
+  const text = value => value == null ? "—" : typeof value === "object" ? JSON.stringify(value) : String(value);
+  const element = (tag, value, className) => {
+    const node = document.createElement(tag);
+    if (value != null) node.textContent = text(value);
+    if (className) node.className = className;
+    return node;
+  };
+  const badge = status => element("span", status, "status " + (statuses.includes(status) || status === "not_applicable" ? status : "planned"));
+  const artifacts = new Map(records(manifest.artifacts).map(artifact => [artifact.id, artifact]));
+  const cases = records(manifest.test_cases);
+  app.replaceChildren();
+
+  function heading(title) {
+    app.append(element("h2", title));
+  }
+
+  function bullets(items) {
+    const ul = element("ul");
+    list(items).forEach(item => ul.append(element("li", item)));
+    return ul;
+  }
+
+  function fields(values) {
+    const dl = element("dl");
+    Object.entries(values || {}).forEach(([key, value]) => {
+      dl.append(element("dt", key.replaceAll("_", " ")), element("dd", text(value)));
+    });
+    return dl;
+  }
+
+  function table(headers, rows) {
+    const wrap = element("div", null, "table-wrap");
+    const node = element("table");
+    const thead = element("thead"), tr = element("tr"), tbody = element("tbody");
+    headers.forEach(header => {
+      const th = element("th", header);
+      th.scope = "col";
+      tr.append(th);
+    });
+    thead.append(tr);
+    rows.forEach(row => {
+      const tr = element("tr");
+      row.forEach(value => {
+        const td = element("td");
+        td.append(value instanceof Node ? value : document.createTextNode(text(value)));
+        tr.append(td);
+      });
+      tbody.append(tr);
+    });
+    node.append(thead, tbody);
+    wrap.append(node);
+    return wrap;
+  }
+
+  // Artifact paths name local files relative to the report, never URLs.
+  function artifactPath(path) {
+    if (typeof path !== "string" || !path || path.startsWith("/") || path.includes("\\") ||
+        /^[a-z][a-z0-9+.-]*:/i.test(path) || /[\u0000-\u001f\u007f]/.test(path) ||
+        path.split("/").some(part => !part || part === "." || part === "..")) return null;
+    return path.split("/").map(encodeURIComponent).join("/");
+  }
+
+  function artifactLink(id) {
+    const artifact = artifacts.get(id);
+    if (!artifact) return element("span", "Missing artifact: " + text(id), "muted");
+    const path = artifactPath(artifact.path);
+    if (!path) return element("span", "Invalid artifact path: " + text(artifact.path), "muted");
+    const link = element("a", artifact.caption || artifact.path);
+    link.href = path;
+    return link;
+  }
+
+  function links(ids) {
+    const span = element("span");
+    list(ids).forEach((id, index) => {
+      if (index) span.append(document.createTextNode(" · "));
+      span.append(artifactLink(id));
+    });
+    return span;
+  }
+
+  function evidence(ids) {
+    const box = element("div", null, "evidence");
+    [...new Set(list(ids))].forEach(id => {
+      const artifact = artifacts.get(id), figure = element("figure");
+      const path = artifact && artifactPath(artifact.path);
+      if (path) {
+        const mime = artifact.media_type || "";
+        let media;
+        if (/^image\//i.test(mime) || /\.(png|jpe?g|gif|webp|avif)$/i.test(artifact.path)) {
+          media = element("img");
+          media.alt = artifact.caption || artifact.path;
+          media.loading = "lazy";
+          const link = element("a");
+          link.href = path;
+          link.append(media);
+          figure.append(link);
+        } else if (/^video\//i.test(mime) || /\.(mp4|mov|m4v|webm)$/i.test(artifact.path)) {
+          media = element("video");
+          media.controls = true;
+          media.preload = "metadata";
+          media.setAttribute("aria-label", artifact.caption || artifact.path);
+          figure.append(media);
+        }
+        if (media) {
+          media.addEventListener("error", () => {
+            figure.append(element("p", "Preview unavailable; use the artifact link.", "muted"));
+          }, { once: true });
+          media.src = path;
+        }
+      }
+      const caption = element("figcaption");
+      caption.append(artifactLink(id));
+      figure.append(caption);
+      box.append(figure);
+    });
+    return box;
+  }
+
+  function notes(title, items) {
+    const entries = records(items);
+    if (!entries.length) return;
+    heading(title);
+    entries.forEach(note => {
+      const card = element("div", null, "card");
+      card.append(element("p", note.description));
+      if (list(note.test_cases).length) card.append(element("p", "Cases: " + note.test_cases.join(", "), "muted"));
+      card.append(evidence(note.artifacts));
+      app.append(card);
+    });
+  }
+
+  app.append(element("h1", cases.length ? "iOS verification" : "iOS environment readiness"));
+  if (cases.length) {
+    const counts = element("div", null, "counts");
+    statuses.forEach(status => counts.append(element("span", cases.filter(test => test.status === status).length + " " + status, "status " + status)));
+    app.append(counts);
+    app.append(element("p", "Results describe selected test cases; the overall assessment is yours.", "muted"));
+    if (cases.some(test => test.status === "assisted_pass")) app.append(element("p", "assisted_pass: expected behaviour observed with a recorded intervention. See each case's scope and the temporary modifications below for unproven conditions and retained app state.", "notice"));
+  }
+  const planned = cases.filter(test => test.status === "planned").length;
+  if (planned) app.append(element("p", planned + (planned === 1 ? " test case is" : " test cases are") + " still planned. This report is in progress.", "notice"));
+  notes("Limitations and coverage gaps", manifest.limitations);
+  const checks = records(manifest.checks);
+  const blockers = checks.filter(check => check.impact === "blocker");
+  if (blockers.length) {
+    heading("Setup blockers");
+    blockers.forEach(check => app.append(element("p", text(check.subject) + ": " + text(check.detail), "notice")));
+  }
+
+  heading("Test cases");
+  if (!cases.length) app.append(element("p", "No test cases recorded.", "muted"));
+  cases.forEach(test => {
+    const card = element("article", null, "card");
+    const title = element("div", null, "case-heading");
+    title.append(element("h3", text(test.id) + " · " + text(test.title)), badge(test.status));
+    card.append(title);
+    if (test.rationale) card.append(element("p", "Selection: " + test.rationale, "muted"));
+    if (list(test.sources).length) card.append(element("h4", "Sources"), bullets(test.sources));
+    if (list(test.preconditions).length) card.append(element("h4", "Preconditions"), bullets(test.preconditions));
+    const steps = records(test.steps);
+    if (steps.length) card.append(table(["Action / observation", "Expected", "Observed", "Evidence"],
+      steps.map(step => [step.action, step.expected, step.observed, links(step.artifacts)])));
+    if (test.detail) card.append(element("p", test.detail));
+    card.append(evidence([...list(test.artifacts), ...steps.flatMap(step => list(step.artifacts))]));
+    app.append(card);
+  });
+
+  const revisions = records(manifest.revisions);
+  if (revisions.length) {
+    heading("Plan revisions");
+    app.append(table(["Revision", "Phase", "Cases", "Change", "Evidence"], revisions.map(revision =>
+      [revision.id, revision.phase, list(revision.test_cases).join(", "), revision.summary, links(revision.artifacts)])));
+  }
+  if (checks.length) {
+    heading("Environment and capture checks");
+    app.append(table(["Check", "Status", "Impact", "Detail", "Evidence"], checks.map(check =>
+      [check.subject, badge(check.status), check.impact, check.detail, links(check.artifacts)])));
+  }
+  notes("Side observations", manifest.side_observations);
+  const modifications = records(manifest.temporary_modifications);
+  if (modifications.length) {
+    heading("Temporary modifications and retained app state");
+    modifications.forEach(change => {
+      const card = element("article", null, "card");
+      card.append(element("h3", change.purpose), element("p", change.description));
+      card.append(fields({affected_cases: list(change.test_cases).join(", "), current_result_dependencies: list(change.result_cases).join(", ") || "None", scope: change.scope,
+        source_restoration: change.state, runtime_state: change.runtime_state, restoration_steps: change.restoration}));
+      card.append(evidence(change.artifacts));
+      app.append(card);
+    });
+  }
+  const tools = records(manifest.tools);
+  if (tools.length) {
+    heading("Tools");
+    app.append(table(["ID", "Tool", "Version", "Roles"], tools.map(tool =>
+      [tool.id, tool.name, tool.version, list(tool.roles).join(", ")])));
+  }
+  heading("Run");
+  app.append(fields(manifest.run));
+  heading("Environment");
+  app.append(fields(manifest.environment));
+  if (artifacts.size) {
+    heading("Artifact registry");
+    app.append(table(["ID", "Kind", "File"], [...artifacts.values()].map(artifact =>
+      [artifact.id, artifact.kind, artifactLink(artifact.id)])));
+  }
+})();
+</script>
+</body>
+</html>

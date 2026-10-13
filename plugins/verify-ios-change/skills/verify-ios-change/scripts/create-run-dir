@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Initialize manifest.json in a fresh run directory outside the project checkouts.
+
+Usage: create-run-dir PROJECT_DIR [SESSION_ID]
+SESSION_ID is recorded as run.session_id; omitted or empty stays null.
+Runs directory: <platform-temp>/<repository-name>/verify-ios-change/runs
+The repository name is the sanitized main checkout name, shared by linked worktrees.
+On failure, report the error and recovery instruction to stderr and exit nonzero.
+Python 3 standard library only.
+"""
+from datetime import datetime, timezone
+import json
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+
+RECOVERY = (
+    "Create a fresh writable temporary run directory outside the project checkout "
+    "and initialize manifest.json from the skill template."
+)
+TEMPLATE = Path(__file__).resolve().parent.parent / "assets" / "manifest.json"
+
+
+def git(project_dir, *args):
+    result = subprocess.run(
+        ["git", "-C", str(project_dir), *args],
+        capture_output=True, text=True, timeout=10, check=True,
+    )
+    return result.stdout.strip()
+
+
+def resolve_runs_dir(project_dir):
+    project_dir = Path(project_dir).resolve()
+    checkout_dir = Path(git(project_dir, "rev-parse", "--show-toplevel")).resolve()
+    # Git lists the main checkout first, including when invoked in a worktree.
+    worktrees = git(project_dir, "worktree", "list", "--porcelain", "-z").split("\0")
+    main_checkout_dir = Path(next(
+        entry.removeprefix("worktree ") for entry in worktrees
+        if entry.startswith("worktree ")
+    )).resolve()
+    repository_name = re.sub(r"[^A-Za-z0-9._-]", "-", main_checkout_dir.name).strip(".-")
+    repository_name = repository_name or "unknown-repo"
+
+    runs_dir = (Path(tempfile.gettempdir()) / repository_name / "verify-ios-change" / "runs").resolve()
+    if any(runs_dir.is_relative_to(directory) for directory in (checkout_dir, main_checkout_dir)):
+        raise ValueError("runs directory must be outside the project and main checkouts")
+
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryFile(dir=runs_dir) as probe:
+        probe.write(b"writable")
+        probe.flush()
+    return runs_dir
+
+
+def create_run_dir(project_dir, session_id=None):
+    manifest = json.loads(TEMPLATE.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict) or manifest.get("schema") != 6:
+        raise ValueError("manifest template must use schema 6")
+    runs_dir = resolve_runs_dir(project_dir)
+    while True:
+        started = datetime.now(timezone.utc)
+        run_dir = runs_dir / started.strftime("%Y%m%dT%H%M%S.%fZ")
+        try:
+            run_dir.mkdir()
+        except FileExistsError:
+            continue
+        try:
+            manifest["run"].update(
+                id=run_dir.name,
+                session_id=session_id or None,
+                project_dir=str(Path(project_dir).resolve()),
+                started_at=started.isoformat().replace("+00:00", "Z"),
+            )
+            (run_dir / "manifest.json").write_text(
+                json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8",
+            )
+        except Exception:
+            shutil.rmtree(run_dir)
+            raise
+        return run_dir
+
+
+def main():
+    try:
+        if len(sys.argv) not in (2, 3) or not sys.argv[1]:
+            raise ValueError("usage: create-run-dir PROJECT_DIR [SESSION_ID]")
+        print(create_run_dir(*sys.argv[1:]))
+    except Exception as error:
+        print(f"ERROR: Could not create run directory: {error}", file=sys.stderr)
+        print(RECOVERY, file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

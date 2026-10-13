@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "verify-ios-change/manifest.schema.json",
+  "title": "verify-ios-change evidence manifest, schema 6",
+  "description": "Evidence for one verification run, valid while unfinished and when completed. Update it in place as work progresses; use null for unknown values. scripts/validate-manifest also checks references and evidence; --final checks completion and the generated report.",
+  "type": "object",
+  "required": [
+    "schema",
+    "run",
+    "environment",
+    "test_cases",
+    "revisions",
+    "checks",
+    "tools",
+    "artifacts",
+    "limitations",
+    "side_observations",
+    "temporary_modifications"
+  ],
+  "properties": {
+    "schema": {
+      "const": 6
+    },
+    "run": {
+      "description": "Run identity, initialized by scripts/create-run-dir.",
+      "type": "object",
+      "required": ["id", "session_id", "project_dir", "started_at", "action_driver", "effort"],
+      "properties": {
+        "id": {
+          "description": "Run ID, the run directory name.",
+          "$ref": "#/$defs/nullable_text"
+        },
+        "session_id": {
+          "description": "Host session ID when available.",
+          "$ref": "#/$defs/nullable_text"
+        },
+        "project_dir": {
+          "description": "Absolute path of the project under verification.",
+          "$ref": "#/$defs/nullable_text"
+        },
+        "started_at": {
+          "description": "ISO 8601 UTC start time, for example 2026-10-12T06:30:00Z.",
+          "type": ["string", "null"],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+        },
+        "action_driver": {
+          "description": "ID of the one tool whose roles include action_driver; null until one is selected.",
+          "$ref": "#/$defs/nullable_text"
+        },
+        "effort": {
+          "description": "Resolved active host effort; null when unavailable or unrecognized. Advanced recovery requires high, xhigh or max.",
+          "type": ["string", "null"],
+          "enum": ["low", "medium", "high", "xhigh", "max", null]
+        }
+      },
+      "additionalProperties": false
+    },
+    "environment": {
+      "description": "Build and device identity. Record readiness evidence in the app/build check.",
+      "type": "object",
+      "required": ["xcode", "runtime", "device", "udid", "bundle_id", "commit"],
+      "properties": {
+        "xcode": { "$ref": "#/$defs/nullable_text" },
+        "runtime": { "$ref": "#/$defs/nullable_text" },
+        "device": { "$ref": "#/$defs/nullable_text" },
+        "udid": { "$ref": "#/$defs/nullable_text" },
+        "bundle_id": { "$ref": "#/$defs/nullable_text" },
+        "commit": { "$ref": "#/$defs/nullable_text" }
+      },
+      "additionalProperties": false
+    },
+    "test_cases": {
+      "description": "The authoritative current plan, updated in place. Empty when the run is blocked before planning.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/case" }
+    },
+    "revisions": {
+      "description": "One record per plan divergence or advanced attempt. Ordinary and advanced revisions use evidence-driven stopping.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/revision" }
+    },
+    "checks": {
+      "description": "Readiness, navigation and cleanup checks, one record per capability, updated in place to the latest result.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "tools": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/tool" }
+    },
+    "artifacts": {
+      "description": "Evidence files, each registered once and referenced by ID.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "limitations": {
+      "description": "Evidence that could not be collected, and the cases it affects.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/note" }
+    },
+    "side_observations": {
+      "description": "Findings outside the change under verification.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/note" }
+    },
+    "temporary_modifications": {
+      "description": "Temporary diagnostic edits and advanced source/runtime interventions, with evidence and cleanup recorded independently of results.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/modification" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "id": {
+      "description": "Unique within its collection, for example TC1, rev.1, chk.build, tool.driver, a.1.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "ids": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/id" }
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nullable_text": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "case": {
+      "type": "object",
+      "required": ["id", "title", "rationale", "sources", "preconditions", "steps", "status", "detail", "artifacts"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "$ref": "#/$defs/text" },
+        "rationale": {
+          "description": "Why this case follows from the change.",
+          "$ref": "#/$defs/text"
+        },
+        "sources": {
+          "description": "Requirement sources (PRD, design reference, diff) as strings.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/text" }
+        },
+        "preconditions": {
+          "description": "Required starting state, each with the in-session reset that restores it.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/text" }
+        },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/step" }
+        },
+        "status": {
+          "description": "planned until judged. pass and assisted_pass need every step observed and a screenshot; assisted_pass also needs a linked intervention preserving the target behaviour.",
+          "enum": ["planned", "pass", "assisted_pass", "fail", "inconclusive", "withdrawn"]
+        },
+        "detail": {
+          "description": "Explains assisted_pass scope and limits, or a fail, inconclusive or withdrawn result; null otherwise.",
+          "$ref": "#/$defs/nullable_text"
+        },
+        "artifacts": {
+          "description": "IDs of evidence for the case as a whole.",
+          "$ref": "#/$defs/ids"
+        }
+      },
+      "additionalProperties": false
+    },
+    "step": {
+      "type": "object",
+      "required": ["action", "expected", "observed", "artifacts"],
+      "properties": {
+        "action": {
+          "description": "Reproducible action with its locator.",
+          "$ref": "#/$defs/text"
+        },
+        "expected": {
+          "description": "Expected effect, stated before acting.",
+          "$ref": "#/$defs/text"
+        },
+        "observed": {
+          "description": "Locator, observation method and result; null until the step is exercised.",
+          "$ref": "#/$defs/nullable_text"
+        },
+        "artifacts": { "$ref": "#/$defs/ids" }
+      },
+      "additionalProperties": false
+    },
+    "revision": {
+      "type": "object",
+      "required": ["id", "phase", "summary", "test_cases", "artifacts"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "phase": {
+          "description": "ordinary recovery uses evidence-driven stopping; advanced recovery requires the effort gate and an exhausted ordinary approach.",
+          "type": "string",
+          "enum": ["ordinary", "advanced"]
+        },
+        "summary": {
+          "description": "What triggered the divergence and what changed. For advanced recovery, explain ordinary exhaustion, the new hypothesis and what the attempt learned.",
+          "$ref": "#/$defs/text"
+        },
+        "test_cases": { "$ref": "#/$defs/ids" },
+        "artifacts": { "$ref": "#/$defs/ids" }
+      },
+      "additionalProperties": false
+    },
+    "check": {
+      "type": "object",
+      "required": ["id", "subject", "status", "impact", "detail", "artifacts"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "subject": { "$ref": "#/$defs/text" },
+        "status": {
+          "enum": ["pass", "fail", "inconclusive", "not_applicable"]
+        },
+        "impact": {
+          "description": "blocker: remaining unavailable after recovery and prevents verification; limitation: optional evidence unavailable; null otherwise. A blocker or limitation needs status fail or inconclusive.",
+          "enum": ["blocker", "limitation", null]
+        },
+        "detail": {
+          "description": "Explains an unavailable capability; required when impact is set.",
+          "$ref": "#/$defs/nullable_text"
+        },
+        "artifacts": { "$ref": "#/$defs/ids" }
+      },
+      "additionalProperties": false
+    },
+    "tool": {
+      "type": "object",
+      "required": ["id", "name", "version", "roles"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "$ref": "#/$defs/text" },
+        "version": { "$ref": "#/$defs/nullable_text" },
+        "roles": {
+          "description": "Build tooling and inspectors can be distinct from the action driver.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["action_driver", "inspector", "diagnostic", "other"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["id", "kind", "path"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": {
+          "description": "Use native_dump for print-tree captures. Video and gif capture are optional.",
+          "enum": ["screenshot", "video", "gif", "accessibility_tree", "native_dump", "log", "trace", "plan", "other"]
+        },
+        "path": {
+          "description": "File path relative to the run directory, without .. segments.",
+          "$ref": "#/$defs/text"
+        },
+        "media_type": { "$ref": "#/$defs/nullable_text" },
+        "caption": { "$ref": "#/$defs/nullable_text" }
+      },
+      "additionalProperties": false
+    },
+    "note": {
+      "type": "object",
+      "required": ["description", "test_cases", "artifacts"],
+      "properties": {
+        "description": { "$ref": "#/$defs/text" },
+        "test_cases": { "$ref": "#/$defs/ids" },
+        "artifacts": { "$ref": "#/$defs/ids" }
+      },
+      "additionalProperties": false
+    },
+    "modification": {
+      "type": "object",
+      "required": ["description", "purpose", "scope", "state", "runtime_state", "restoration", "test_cases", "result_cases", "artifacts"],
+      "properties": {
+        "description": {
+          "description": "The edit or runtime intervention and why it was needed; include its mechanism and affected source/state.",
+          "$ref": "#/$defs/text"
+        },
+        "purpose": {
+          "description": "diagnostic is ordinary behaviour-neutral observation; intervention is an advanced recovery technique, including added instrumentation needed for that recovery.",
+          "type": "string",
+          "enum": ["diagnostic", "intervention"]
+        },
+        "scope": {
+          "description": "For an intervention, identify the real behaviour preserved and the conditions or claims left unproven. Null for ordinary diagnostics.",
+          "$ref": "#/$defs/nullable_text"
+        },
+        "state": {
+          "description": "Source restoration only: reverted, not_reverted, or runtime_only when no source was edited. Independent of case results; no recheck is required.",
+          "type": "string",
+          "enum": ["reverted", "not_reverted", "runtime_only"]
+        },
+        "runtime_state": {
+          "description": "Build/process identity used for evidence and the runtime state left for inspection. Required at Finish; null while not yet observed.",
+          "$ref": "#/$defs/nullable_text"
+        },
+        "restoration": {
+          "description": "Concrete steps to restore retained build/state/resources, or an explanation that no further restoration is needed. Required at Finish; null while being determined.",
+          "$ref": "#/$defs/nullable_text"
+        },
+        "test_cases": {
+          "description": "All cases affected by this modification, retained even after later independent verification. An intervention requires at least one affected case.",
+          "$ref": "#/$defs/ids"
+        },
+        "result_cases": {
+          "description": "Subset of test_cases whose current verification depends on this modification. Remove a case only after independent evidence replaces that dependency; preserve test_cases and artifacts as history.",
+          "$ref": "#/$defs/ids"
+        },
+        "artifacts": {
+          "description": "Patch, fixture, debugger transcript or other evidence of the modification. Required for a completed assisted_pass.",
+          "$ref": "#/$defs/ids"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

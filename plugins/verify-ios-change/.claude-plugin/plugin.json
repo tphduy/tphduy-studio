@@ -1,0 +1,9 @@
+{
+  "name": "verify-ios-change",
+  "version": "0.5.2",
+  "description": "Prepare and verify changed iOS screens or interactions in a simulator with runtime evidence.",
+  "author": {
+    "name": "Duy Tran"
+  },
+  "license": "MIT"
+}
